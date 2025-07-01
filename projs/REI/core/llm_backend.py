@@ -63,7 +63,7 @@ class GeminiBackend(LLMBackend):
     async def generate(self, prompt_parts, temp: float, top_p: float, top_k: float, sys_inst: str) -> str:
         print("--- GEMINI BACKEND GENERATE START ---")
         try:
-            response = await self.client.model.generate_content(
+            response = self.client.models.generate_content(
                 model="gemini-2.5-flash",
                 contents=prompt_parts,
                 config=types.GenerateContentConfig(
@@ -71,6 +71,9 @@ class GeminiBackend(LLMBackend):
                     top_k= top_k,
                     top_p = top_p,
                     temperature=temp,
-                ),
-
+                )
             )
+            return response.text
+        except Exception as e:
+            print("--- GEMINI BACKEND GENERATION FAULT")
+            print(f"--- EXCEPTION IS {e} ---")
