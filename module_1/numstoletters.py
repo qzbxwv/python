@@ -1,3 +1,6 @@
+# 7 kyu
+# my solution
+
 let_dict = {
     "29": " ",
     "28": "?",
@@ -38,4 +41,10 @@ def switcher(arr):
     return word
 
 
-print(switcher(input().split()))
+# best practice
+#
+chars = "_zyxwvutsrqponmlkjihgfedcba!? "
+
+
+def switcher_best(arr):
+    return "".join(chars[int(i)] for i in arr if i != "0")
