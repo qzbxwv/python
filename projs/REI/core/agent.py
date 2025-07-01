@@ -1,6 +1,7 @@
 from typing import List, Dict
 from .tools import Tool, GoogleSearch, PythonCodeExec, WikiAPI
 from .llm_backend import LLMBackend, FakeGeminiBackend
+from . import prompts
 import json5
 
 class REIAgent:
@@ -8,17 +9,22 @@ class REIAgent:
         self.backend = backend
         self.tools: Dict[str, Tool] = {tool.name: tool for tool in tools}
 
-    def run(self, prompt_parts):
-        pass
+    async def run(self, prompt_parts):
+        
+        thoughts = await _run_sequential_thinking(prompt_parts)
 
-    def _run_sequential_thinking(self, prompt_parts):
+        response = await _run_synthesist(prompt_parts, thoughts)
+
+        return response
+
+    async def _run_sequential_thinking(self, prompt_parts):
         thoughs_history = []
         nextThoughtNeeded = True
 
         while nextThoughtNeeded:
             prompt = f"Запрос: {prompt_parts}. История мыслей: {json5.dumps(thoughs_history)}"
 
-            thought = self.backend.generate(
+            thought = await self.backend.generate(
                 prompt, temp=0.7, top_p=0.5, top_k=10.0, sys_inst="sys_inst"
             )
 
@@ -58,3 +64,6 @@ class REIAgent:
             # TODO добавить проверку на ответ nextThoughtNeeded модели
             nextThoughtNeeded = False
         return thoughs_history
+    
+    async def _run_synthesist(self, prompt_parts, thoughs_history):
+        
