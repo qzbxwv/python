@@ -1,6 +1,6 @@
 from typing import List, Dict
 from .tools import Tool, GoogleSearch, PythonCodeExec, WikiAPI
-from .llm_backend import LLMBackend, FakeGeminiBackend
+from .llm_backend import LLMBackend, GeminiBackend
 from . import prompts
 import json5
 
@@ -9,24 +9,14 @@ class REIAgent:
         self.backend = backend
         self.tools: Dict[str, Tool] = {tool.name: tool for tool in tools}
 
-    async def run(self, prompt_parts):
-        
-        thoughts = await _run_sequential_thinking(prompt_parts)
-
-        response = await _run_synthesist(prompt_parts, thoughts)
-
-        return response
-
-    async def _run_sequential_thinking(self, prompt_parts):
+    async def _run_sequential_thinking(self, prompt_parts, sys_inst):
         thoughs_history = []
         nextThoughtNeeded = True
 
         while nextThoughtNeeded:
             prompt = f"Запрос: {prompt_parts}. История мыслей: {json5.dumps(thoughs_history)}"
 
-            thought = await self.backend.generate(
-                prompt, temp=0.7, top_p=0.5, top_k=10.0, sys_inst="sys_inst"
-            )
+            thought = await self.backend.generate(prompt_parts=prompt, temp=0.8, sys_inst=sys_inst)
 
             try:
                 parsed_thought = json5.loads(thought)
@@ -46,8 +36,8 @@ class REIAgent:
                 print(f"Агент хочет использовать {tool_name_from_llm}")
                 if tool_name_from_llm in self.tools:
                     tool_use = self.tools[tool_name_from_llm]
-                    tool_query = parsed_thought.get("tool_query")
-                    tool_result = tool_use.use(tool_query)
+                    tool_use_query = str(parsed_thought.get("tool_query"))
+                    tool_result = tool_use.use(tool_use_query)
                     print(f"Результат использования Tool: {tool_result}")
                     tool_result_thought = {
                         "type": "tool_output",
@@ -65,5 +55,16 @@ class REIAgent:
             nextThoughtNeeded = False
         return thoughs_history
     
-    async def _run_synthesist(self, prompt_parts, thoughs_history):
+    async def _run_synthesist(self, prompt_parts, thoughs_history, sys_inst):
+        return prompt_parts, thoughs_history, sys_inst
+
+
+    async def run(self, prompt_parts):
         
+        thoughts = await self._run_sequential_thinking(prompt_parts, sys_inst=prompts.SEQUENTIAL_THINKING_PROMPT_RU)
+
+        response = await self._run_synthesist(prompt_parts, thoughts, sys_inst=prompts.FINAL_SYNTHESIS_PROMPT_RU)
+
+        return response
+
+

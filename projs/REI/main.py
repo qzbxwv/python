@@ -1,13 +1,14 @@
 from core.agent import REIAgent
 from core.tools import Tool, GoogleSearch, PythonCodeExec, WikiAPI
-from core.llm_backend import LLMBackend, FakeGeminiBackend
+from core.llm_backend import LLMBackend, GeminiBackend
+import asyncio
 
 
-def main():
+async def main():
     print("--- Configuring REI ---")
 
     print("--- BACKEND/// ---")
-    backend_instanse = FakeGeminiBackend(api_key="SOMEAPIKEY")
+    backend_instanse = GeminiBackend()
     print("--- ///BACKEND READY ---")
 
     print("--- TOOLS GETTING READY/// ---")
@@ -28,10 +29,10 @@ def main():
     print(f"  - DESCRIPTION: {rei_instanse.tools[first_tool_name].desc}")
 
     print("--- BACKEND START")
-    response = rei_instanse._run_sequential_thinking("Запрос пользователя")
+    response = await rei_instanse.run("Привет!")
     print(f"--- BACKEND  RESPONSE: {response}")
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
 
