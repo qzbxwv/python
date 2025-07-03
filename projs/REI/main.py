@@ -1,36 +1,36 @@
-from core.agent import REIAgent
-from core.tools import Tool, GoogleSearch, PythonCodeExec, WikiAPI
+from core.agent import EGO
+from core.tools import Tool, EgoSearch, PythonCodeExec, WikiAPI
 from core.llm_backend import LLMBackend, GeminiBackend
 import asyncio
 
 
 async def main():
-    print("--- Configuring REI ---")
+    print("--- Configuring EGO---")
 
-    print("--- BACKEND/// ---")
+    print("--- BACKEND ---")
     backend_instanse = GeminiBackend()
-    print("--- ///BACKEND READY ---")
+    print("--- BACKEND READY ---")
 
-    print("--- TOOLS GETTING READY/// ---")
-    tools_list = [GoogleSearch(), PythonCodeExec(), WikiAPI()]
-    print("--- ///TOOLS READY ---")
+    print("--- TOOLS ---")
+    tools_list = [EgoSearch(), PythonCodeExec(), WikiAPI()]
+    print("--- TOOLS READY ---")
 
-    print("--- REI Reflect. Evaluate.///")
-    rei_instanse = REIAgent(backend=backend_instanse, tools=tools_list)
-    print("--- ///INTELLIGENSE ---")
+    print("--- EGO Emergent. Grasp. ---")
+    ego_instanse = EGO(backend=backend_instanse, tools=tools_list)
+    print("--- Organism ---")
 
-    print("--- REI INFO ---")
-    print(f"BACKEND : {type(rei_instanse.backend)}")
-    print(f"TOOLS : {list(rei_instanse.tools.keys())}")
+    print("--- EGO INFO ---")
+    print(f"BACKEND : {type(ego_instanse.backend)}")
+    print(f"TOOLS : {list(ego_instanse.tools.keys())}")
 
-    first_tool_name = list(rei_instanse.tools.keys())[0]
+    first_tool_name = list(ego_instanse.tools.keys())[0]
     print(f"FIRST TOOL'{first_tool_name}':")
-    print(f"  - NAME: {rei_instanse.tools[first_tool_name].name}")
-    print(f"  - DESCRIPTION: {rei_instanse.tools[first_tool_name].desc}")
+    print(f"  - NAME: {ego_instanse.tools[first_tool_name].name}")
+    print(f"  - DESCRIPTION: {ego_instanse.tools[first_tool_name].desc}")
 
-    print("--- BACKEND START")
-    response = await rei_instanse.run("Привет!")
-    print(f"--- BACKEND  RESPONSE: {response}")
+    print("--- BACKEND START ---")
+    response = await ego_instanse.run(str(input("Get EGO a work: ")))
+    print("--- BACKEND  END ---")
 
 
 if __name__ == "__main__":
