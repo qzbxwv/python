@@ -1,9 +1,7 @@
 from typing import List, Dict
-
-from google.genai.types import ReplayResponse
-from .tools import Tool, EgoSearch, PythonCodeExec, WikiAPI
+from .tools import Tool, EgoSearch, EgoCode, EgoWiki
 from .llm_backend import LLMBackend, GeminiBackend
-from .prompts import SEQUENTIAL_THINKING_PROMPT_RU, FINAL_SYNTHESIS_PROMPT_RU, EGO_SEARCH_PROMPT_RU
+from .prompts import SEQUENTIAL_THINKING_PROMPT_RU, FINAL_SYNTHESIS_PROMPT_RU, EGO_SEARCH_PROMPT_RU, ALTER_EGO_PROMPT_RU
 import json5
 
 class EGO:
@@ -48,10 +46,19 @@ class EGO:
             if tool_name_from_llm == "EgoSearch":
                 print("--- EGO WANTS TO USE EGOSEARCH ---")
                 egosearch_query = str(parsed_thought.get("tool_query"))
-                print('--- EGO QUERY: ', egosearch_query)
+                print('--- EGO SEARCH QUERY: ', egosearch_query)
                 egosearch_result = await self.backend.generate(prompt_parts=egosearch_query, temp=0.9, sys_inst=EGO_SEARCH_PROMPT_RU, google_search=True)
                 thoughs_history.append(egosearch_result)
-            elif tool_name_from_llm != "EgoSearch":
+
+            elif tool_name_from_llm == "AlterEgo":
+                print("--- EGO WANTS ALTEREGO TO TAKE OVER ---")
+                alterego_query = str(parsed_thought.get("tool_query"))
+                print(f"--- ALTER TAKES OVER EGO WITH QUERY: {alterego_query}")
+                alterego_response = await self.backend.generate(prompt_parts=alterego_query, temp=0.9, sys_inst=ALTER_EGO_PROMPT_RU)
+                print("--- ALTER RESPONSE: ", alterego_response)
+                thoughs_history.append(alterego_response)
+
+            elif tool_name_from_llm != None:
                 print(f"--- EGO WANTS TO USE {tool_name_from_llm} ---")
                 if tool_name_from_llm in self.tools:
                     tool_use = self.tools[tool_name_from_llm]
@@ -68,6 +75,8 @@ class EGO:
                     print(
                         f"--- TOOL NOT FOUND: {tool_name_from_llm} ---"
                     )
+            else:
+                print("TOOLS DONT NEEDED")
 
             thoughs_history.append(parsed_thought)
             

@@ -1,5 +1,5 @@
 from core.agent import EGO
-from core.tools import Tool, EgoSearch, PythonCodeExec, WikiAPI
+from core.tools import Tool, EgoSearch, EgoCode, EgoWiki
 from core.llm_backend import LLMBackend, GeminiBackend
 import asyncio
 
@@ -12,7 +12,7 @@ async def main():
     print("--- BACKEND READY ---")
 
     print("--- TOOLS ---")
-    tools_list = [EgoSearch(), PythonCodeExec(), WikiAPI()]
+    tools_list = [EgoSearch(), EgoCode(), EgoWiki()]
     print("--- TOOLS READY ---")
 
     print("--- EGO Emergent. Grasp. ---")
