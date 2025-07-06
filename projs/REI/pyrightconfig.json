@@ -1,7 +1,0 @@
-{
-  "include": ["REI"],
-  "venvPath": ".",
-  "venv": "venv",
-  "reportMissingImports": true,
-  "pythonPlatform": "Linux"
-}

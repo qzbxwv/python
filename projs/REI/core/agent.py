@@ -1,107 +1,87 @@
-from typing import List, Dict
-from .tools import Tool, EgoSearch, EgoCode, EgoWiki
-from .llm_backend import LLMBackend, GeminiBackend
-from .prompts import SEQUENTIAL_THINKING_PROMPT_RU, FINAL_SYNTHESIS_PROMPT_RU, EGO_SEARCH_PROMPT_RU, ALTER_EGO_PROMPT_RU
+from typing import List, Dict, Any, cast
+from .tools import Tool
+from .llm_backend import LLMBackend
+from .prompts import SEQUENTIAL_THINKING_PROMPT_RU, FINAL_SYNTHESIS_PROMPT_RU
 import json5
 
 class EGO:
-    def __init__(self, backend: LLMBackend, tools: List[Tool]):
+    def __init__(self, backend: LLMBackend, tools: List[Tool], max_thoughts: int = 15, max_retries: int = 3):
         self.backend = backend
         self.tools: Dict[str, Tool] = {tool.name: tool for tool in tools}
+        self.max_thoughts = max_thoughts
+        self.max_retries = max_retries
 
-    async def _run_ego_thinking(self, prompt_parts, sys_inst):
-        thoughs_history = []
-        nextThoughtNeeded = True
+    def _extract_json_from_response(self, text: str) -> str:
+        text = text.strip()
+        if '```json' in text:
+            text = text.split('```json', 1)[1]
+        if '```' in text:
+            text = text.split('```', 1)[0]
+        return text.strip()
 
-        while nextThoughtNeeded:
-            prompt = f"Запрос: {prompt_parts}. История мыслей: {json5.dumps(thoughs_history)}"
-
-            thought = await self.backend.generate(prompt_parts=prompt, temp=0.8, sys_inst=sys_inst)
+    async def _run_ego_thinking(self, prompt_parts: str, sys_inst: str):
+        thoughts_history: List[Dict[str, Any]] = []
+        
+        for _ in range(self.max_thoughts):
+            context = {"user_query": prompt_parts, "thoughts_history": thoughts_history}
+            prompt = json5.dumps(context, ensure_ascii=False)
             
-            clean_thought = thought.strip()
+            parsed_thought: Dict[str, Any] | None = None
+            current_sys_inst = sys_inst
 
-            if clean_thought.startswith("```json"):
-                clean_thought = clean_thought[7:]
+            for attempt in range(self.max_retries):
+                response_text = await self.backend.generate(prompt_parts=prompt, temp=0.7, sys_inst=current_sys_inst)
+                clean_json_str = self._extract_json_from_response(response_text)
+                
+                try:
+                    parsed_json = json5.loads(clean_json_str)
+                    if isinstance(parsed_json, dict):
+                        parsed_thought = cast(Dict[str, Any], parsed_json)
+                        break 
+                except Exception as e:
+                    print(f"--- JSON PARSE ERROR (Attempt {attempt + 1}/{self.max_retries}): {e} ---")
+                    current_sys_inst += f"\n[СИСТЕМНАЯ ОШИБКА]: Твой JSON не парсится. Ошибка: {e}. Исправь и верни только валидный JSON."
             
-            if clean_thought.startswith("```"):
-                clean_thought = clean_thought[3:]
+            if parsed_thought is None:
+                print("--- EGO FAILED TO GENERATE VALID JSON. ABORTING. ---")
+                break
 
-            if clean_thought.endswith('```'):
-                clean_thought = clean_thought[:-3]
+            thoughts_history.append({"type": "thought", "content": parsed_thought})
 
-            try:
-                parsed_thought = json5.loads(clean_thought)
-                if not isinstance(parsed_thought, Dict):
-                    print("LLM RETURNED NOT-VALID JSON")
-                    nextThoughtNeeded = False
-                    continue
-            except Exception as e:
-                print("--- JSON PARSE ERROR ---")
-                print(f"--- JSON:{thought} ---")
-                print(f"--- ERROR: {e} ---")
-                nextThoughtNeeded = False
-                continue
-
-            tool_name_from_llm = parsed_thought.get("tool_name")
-            if tool_name_from_llm == "EgoSearch":
-                print("--- EGO WANTS TO USE EGOSEARCH ---")
-                egosearch_query = str(parsed_thought.get("tool_query"))
-                print('--- EGO SEARCH QUERY: ', egosearch_query)
-                egosearch_result = await self.backend.generate(prompt_parts=egosearch_query, temp=0.9, sys_inst=EGO_SEARCH_PROMPT_RU, google_search=True)
-                thoughs_history.append(egosearch_result)
-
-            elif tool_name_from_llm == "AlterEgo":
-                print("--- EGO WANTS ALTEREGO TO TAKE OVER ---")
-                alterego_query = str(parsed_thought.get("tool_query"))
-                print(f"--- ALTER TAKES OVER EGO WITH QUERY: {alterego_query}")
-                alterego_response = await self.backend.generate(prompt_parts=alterego_query, temp=0.9, sys_inst=ALTER_EGO_PROMPT_RU)
-                print("--- ALTER RESPONSE: ", alterego_response)
-                thoughs_history.append(alterego_response)
-
-            elif tool_name_from_llm is not None or tool_name_from_llm != "None" :
-                print(f"--- EGO WANTS TO USE {tool_name_from_llm} ---")
-                if tool_name_from_llm in self.tools:
-                    tool_use = self.tools[tool_name_from_llm]
-                    tool_use_query = str(parsed_thought.get("tool_query"))
-                    tool_result = await tool_use.use(tool_use_query)
-                    print(f"--- TOOL USED WITH RESULT: {tool_result} ---")
-                    tool_result_thought = {
-                        "type": "tool_output",
-                        "tool_name": tool_name_from_llm,
-                        "tool_output": str(tool_result),
-                    }
-                    thoughs_history.append((tool_result_thought))
+            tool_name = parsed_thought.get("tool_name")
+            if isinstance(tool_name, str) and tool_name and tool_name.lower() != "none":
+                print(f"--- EGO WANTS TO USE: {tool_name} ---")
+                if tool_name in self.tools:
+                    tool_to_use = self.tools[tool_name]
+                    query = str(parsed_thought.get("tool_query", ""))
+                    
+                    try:
+                        result = await tool_to_use.use(query=query, backend=self.backend)
+                        thoughts_history.append({"type": "tool_output", "tool_name": tool_name, "output": result})
+                    except Exception as e:
+                        print(f"--- TOOL '{tool_name}' FAILED: {e} ---")
+                        thoughts_history.append({"type": "tool_error", "tool_name": tool_name, "error": str(e)})
                 else:
-                    print(
-                        f"--- TOOL NOT FOUND: {tool_name_from_llm} ---"
-                    )
-            else:
-                print("TOOLS DONT NEEDED")
+                    print(f"--- TOOL NOT FOUND: {tool_name} ---")
+                    thoughts_history.append({"type": "system_note", "note": f"Инструмент '{tool_name}' не найден."})
 
-            thoughs_history.append(parsed_thought)
-            
-            next_thoughts = parsed_thought.get("nextThoughtNeeded")
-            if next_thoughts:
-                continue
-            else:
-                nextThoughtNeeded = False
-                print("--- NEXT THOUGHTS FALSE ---")
-
-        return thoughs_history
+            if parsed_thought.get("nextThoughtNeeded") is False:
+               print("--- EGO DECIDED TO STOP ---")
+               break
+        
+        return thoughts_history
     
-    async def _run_egosynth(self, prompt_parts, thoughs_history, sys_inst):
-        prompt = 'generate' 
-
+    async def _run_egosynth(self, prompt_parts, thoughts_history, sys_inst):
         try:
-            response = await self.backend.generate(prompt_parts=prompt, temp=0.9, sys_inst=sys_inst.format(user_query=prompt_parts,thoughts_history=json5.dumps(thoughs_history)))
-
+            formatted_history = json5.dumps(thoughts_history, ensure_ascii=False, indent=2)
+            final_prompt = sys_inst.format(user_query=prompt_parts, thoughts_history=formatted_history)
+            response = await self.backend.generate(prompt_parts="", temp=0.8, sys_inst=final_prompt)
             return response
         except Exception as e:
-            print("--- ERROR WITH BACKEND ---")
-            print(f"--- ERROR IS {e} ---")  
+            print(f"--- ERROR WITH EGOSYNTH: {e} ---")
+            return "Синтез ответа не удался из-за внутренней ошибки."
 
-
-    async def run(self, prompt_parts):
+    async def run(self, prompt_parts: str):
         print("--- RUN START ---")
         print("--- EGO THINKING START ///---")
         thoughts = await self._run_ego_thinking(prompt_parts, sys_inst=SEQUENTIAL_THINKING_PROMPT_RU)
@@ -109,7 +89,4 @@ class EGO:
         print("--- STARTING EGOSYNTH ///---")
         response = await self._run_egosynth(prompt_parts, thoughts, sys_inst=FINAL_SYNTHESIS_PROMPT_RU)
         print("---/// EGOSYNTH END ---")
-
         return response
-
-
