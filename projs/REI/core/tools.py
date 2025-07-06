@@ -24,7 +24,7 @@ class EgoSearch(Tool):
         return 'Ego Seach not IMPLEMENTED as tool use'
     
 class AlterEgo(Tool):
-    def __init__(self, name, desc):
+    def __init__(self):
         super().__init__(name="AlterEgo", desc="AlterEgo takes over Ego")
     
     async def use(self, query: str) -> str:

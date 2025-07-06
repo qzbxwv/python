@@ -1,13 +1,11 @@
 from fastapi import FastAPI
+from pydantic import BaseModel
 
 app = FastAPI()
 
-@app.get('/usr/me')
-async def read_usr_me():
-    return {'user': 'current user'}
-
-@app.get('/usr/{usrid}')
-async def read_usr_id(usrid : str):
-    return {'user': usrid}
-
-
+@app.get("/items/")
+async def read_items(q: str | None = None):
+    results = {"items": [{"item_id": "Foo"}, {"item_id": "Bar"}]}
+    if q:
+        results.update({"q": q})
+    return results

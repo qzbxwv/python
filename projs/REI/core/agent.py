@@ -58,7 +58,7 @@ class EGO:
                 print("--- ALTER RESPONSE: ", alterego_response)
                 thoughs_history.append(alterego_response)
 
-            elif tool_name_from_llm != None:
+            elif tool_name_from_llm is not None or tool_name_from_llm != "None" :
                 print(f"--- EGO WANTS TO USE {tool_name_from_llm} ---")
                 if tool_name_from_llm in self.tools:
                     tool_use = self.tools[tool_name_from_llm]
@@ -86,15 +86,15 @@ class EGO:
             else:
                 nextThoughtNeeded = False
                 print("--- NEXT THOUGHTS FALSE ---")
-            nextThoughtNeeded = False
 
         return thoughs_history
     
     async def _run_egosynth(self, prompt_parts, thoughs_history, sys_inst):
-        prompt = f"Запрос: {prompt_parts}. Мысли для синтеза: {thoughs_history}"
+        prompt = 'generate' 
 
         try:
-            response = await self.backend.generate(prompt_parts=prompt, temp=0.9, sys_inst=sys_inst)
+            response = await self.backend.generate(prompt_parts=prompt, temp=0.9, sys_inst=sys_inst.format(user_query=prompt_parts,thoughts_history=json5.dumps(thoughs_history)))
+
             return response
         except Exception as e:
             print("--- ERROR WITH BACKEND ---")

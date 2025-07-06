@@ -33,7 +33,7 @@ class GeminiBackend(LLMBackend):
             ego_config = types.GenerateContentConfig(temperature=temp, system_instruction=sys_inst, tools=[egosearch_tool])
         try:
             response = await self.client.aio.models.generate_content(
-                model="gemini-2.5-flash",
+                model="gemini-2.0-flash",
                 contents="".join(str(prompt_parts) for part in prompt_parts) if isinstance(prompt_parts, list) else str(prompt_parts),
                 config=ego_config, 
                 )
